@@ -1,6 +1,7 @@
 # Ignore Python cache files
 __pycache__/
 *.pyc
+*.db
 
 # Ignore local database (optional - usually kept if small)
 # weather_history.db
