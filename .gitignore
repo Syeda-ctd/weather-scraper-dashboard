@@ -1,0 +1,15 @@
+# Ignore Python cache files
+__pycache__/
+*.pyc
+
+# Ignore local database (optional - usually kept if small)
+# weather_history.db
+
+# Ignore virtual environments
+venv/
+env/
+
+# Ignore sensitive or temp files
+.env
+.streamlit/
+data/raw_weather.csv
