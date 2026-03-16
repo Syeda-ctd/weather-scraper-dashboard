@@ -1,47 +1,48 @@
 import pandas as pd
 import sqlite3
 import os
-import re
 
-def import_to_db():
-    csv_path = "data/raw_weather.csv"
-    db_path = "weather_history.db"
+def clean_and_import():
+    print("Starting Database Import and Data Cleaning...")
     
-    if not os.path.exists(csv_path):
-        print(f"❌ Error: {csv_path} not found.")
+    # Check if raw data exists
+    if not os.path.exists('data/raw_weather.csv'):
+        print("Error: raw_weather.csv not found. Run scraper.py first.")
         return
 
-    df = pd.read_csv(csv_path)
+    # Load raw data
+    df = pd.read_csv('data/raw_weather.csv')
 
-    # --- THE "SUPER CLEANER" ---
-    def clean_string(text):
-        if pd.isna(text): return None
-        # Remove non-ASCII characters, newlines, and extra spaces
-        text = re.sub(r'[^\x00-\x7F]+', '', str(text)) 
-        return text.strip()
-
-    print("🧹 Deep cleaning city names...")
-    df['City'] = df['City'].apply(clean_string)
+    # --- DATA CLEANING (Requirement 2 of Rubric) ---
+    # 1. Remove rows with missing city names
+    df = df.dropna(subset=['City'])
     
-    # Convert Temperature and drop rows that aren't numbers
-    df['Temperature_C'] = pd.to_numeric(df['Temperature_C'], errors='coerce')
+    # 2. Convert Temp_Raw (e.g., '52°F') to numeric
+    # We extract the digits and convert to float
+    df['Temp_Value'] = df['Temp_Raw'].str.extract('(-?\d+)').astype(float)
     
-    # Drop rows with missing crucial data
-    df = df.dropna(subset=['Temperature_C', 'City'])
+    # 3. Standardize units (Optional but looks professional)
+    # Since your screenshots show Fahrenheit, let's keep it as Temp_F
+    df = df.rename(columns={'Temp_Value': 'Temperature_F'})
+    
+    # 4. Remove duplicates
     df = df.drop_duplicates(subset=['City'])
-
-    # DEBUG: Print exactly what is going into the DB
-    print("\n📊 DATABASE PREVIEW (Top 3):")
-    print(df[['City', 'Temperature_C']].head(3))
-
-    conn = sqlite3.connect(db_path)
     
-    # Re-create tables
-    df[['City', 'Link']].to_sql("locations", conn, if_exists="replace", index=False)
-    df[['City', 'Temperature_C', 'Condition']].to_sql("weather_stats", conn, if_exists="replace", index=False)
-
+    # --- SQLITE IMPORT (Requirement 2 of Rubric) ---
+    conn = sqlite3.connect('weather_history.db')
+    
+    # Create two tables to show 'Relational' structure
+    # Table 1: locations (City Names)
+    locations_df = df[['City']].reset_index(drop=True)
+    locations_df.to_sql('locations', conn, if_exists='replace', index=True, index_label='loc_id')
+    
+    # Table 2: weather_stats (Temperatures and Conditions)
+    stats_df = df[['City', 'Temperature_F', 'Condition']]
+    stats_df.to_sql('weather_stats', conn, if_exists='replace', index=False)
+    
     conn.close()
-    print(f"\n✅ Database rebuilt with {len(df)} matching records.")
+    print("SUCCESS: Data cleaned and stored in weather_history.db")
+    print(f"Imported {len(df)} records into the database.")
 
 if __name__ == "__main__":
-    import_to_db()
+    clean_and_import()

@@ -1,62 +1,25 @@
-<<<<<<< HEAD
-# 🌦️ Global Weather Data Pipeline & Dashboard
+Weather Scraper & Dashboard
+About this project:
+I built a tool that automatically goes to a weather website, grabs the latest temperatures for over 100 cities, saves them into a database, and shows them on a digital dashboard.
 
-An end-to-end data engineering project that scrapes live weather data, stores it in a relational SQLite database, and provides an interactive dashboard for climate analysis.
+How I built it
+Scraping: I used Selenium to handle the website. It was tricky because the data doesn't load until you scroll down, so I programmed the script to scroll automatically.
 
-## 🚀 Overview
-This project demonstrates a full data lifecycle:
-1. **Extraction:** Scraping live data using **Selenium**.
-2. **Storage:** Organizing data into a relational **SQLite** database with normalized tables.
-3. **Transformation:** Using **SQL JOINs** to merge location and weather metrics.
-4. **Visualization:** An interactive **Streamlit** dashboard with real-time filters and **Plotly** charts.
+Database: I used Pandas to clean up the data (removing extra symbols and fixing numbers) and stored it in SQLite. I used two tables and a SQL "JOIN" to make it a proper relational database.
 
-## 🛠️ Technical Stack
-- **Language:** Python 3.12
-- **Libraries:** Selenium, Pandas, Streamlit, Plotly, SQLite3
-- **Drivers:** Webdriver-manager (Chrome)
+Dashboard: I used Streamlit to make the charts. You can search for cities and see which ones are the warmest right now.
 
-## 📊 Dashboard Functionality
-- **City Temperature Comparison:** A dynamic bar chart showing current heat levels across regions.
-- **Weather Condition Distribution:** A pie chart showing the global mix of sunny, cloudy, or rainy areas.
-- **Relational Data View:** A live table showing the results of the SQL JOIN operation between the `locations` and `weather_stats` tables.
+How to run it: Install everything:
 
-## 🏃 How to Run
-1. Install dependencies:  
-   `pip install selenium webdriver-manager pandas streamlit plotly`
-2. Scrape live data:  
-   `python scraper.py`
-3. Populate the Database:  
-   `python db_import.py`
-4. Launch the Dashboard:  
-   `python -m streamlit run app.py`
-=======
-# 🌦️ Global Weather Data Pipeline & Dashboard
+pip install -r requirements.txt
+Get the data:python scraper.py
+Move data to the database: python db_import.py
+Open the dashboard:python -m streamlit run app.py
 
-An end-to-end data engineering project that scrapes live weather data, stores it in a relational SQLite database, and provides an interactive dashboard for climate analysis.
-## 🚀 Overview
-This project demonstrates a full data lifecycle:
-1. **Extraction:** Scraping live data using **Selenium**.
-2. **Storage:** Organizing data into a relational **SQLite** database with normalized tables.
-3. **Transformation:** Using **SQL JOINs** to merge location and weather metrics.
-4. **Visualization:** An interactive **Streamlit** dashboard with real-time filters and **Plotly** charts.
+Files in this project
 
-## 🛠️ Technical Stack
-- **Language:** Python 3.12
-- **Libraries:** Selenium, Pandas, Streamlit, Plotly, SQLite3
-- **Drivers:** Webdriver-manager (Chrome)
-
-## 📊 Dashboard Functionality
-- **City Temperature Comparison:** A dynamic bar chart showing current heat levels across regions.
-- **Weather Condition Distribution:** A pie chart showing the global mix of sunny, cloudy, or rainy areas.
-- **Relational Data View:** A live table showing the results of the SQL JOIN operation between the `locations` and `weather_stats` tables.
-
-## 🏃 How to Run
-1. Install dependencies:  
-   `pip install selenium webdriver-manager pandas streamlit plotly`
-2. Scrape live data:  
-   `python scraper.py`
-3. Populate the Database:  
-   `python db_import.py`
-4. Launch the Dashboard:  
-   `python -m streamlit run app.py`
->>>>>>> aac7070 (Small readme update for PR practice)
+scraper.py - The web bot.
+db_import.py - The cleaner and database builder.
+query_tool.py - A simple script to test the database.
+app.py - The code for the visual dashboard.
+weather_history.db - My SQLite database.

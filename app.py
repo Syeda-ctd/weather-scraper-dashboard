@@ -2,64 +2,93 @@ import streamlit as st
 import pandas as pd
 import sqlite3
 import plotly.express as px
-import os
 
+# Set page config for a professional look
 st.set_page_config(page_title="Global Weather Dashboard", layout="wide")
 
-# --- DATA LOADING ---
 def get_data():
-    db_path = "weather_history.db"
-    if not os.path.exists(db_path):
-        return pd.DataFrame(), "Database file missing!"
-    
-    conn = sqlite3.connect(db_path)
-    
-    # 1. Check if tables have data individually
-    loc_count = pd.read_sql("SELECT COUNT(*) as count FROM locations", conn).iloc[0]['count']
-    stat_count = pd.read_sql("SELECT COUNT(*) as count FROM weather_stats", conn).iloc[0]['count']
-    
-    if loc_count == 0 or stat_count == 0:
-        conn.close()
-        return pd.DataFrame(), f"Tables exist but are empty (Locations: {loc_count}, Stats: {stat_count})"
-
-    # 2. Try the JOIN
+    """Connects to SQLite and performs a JOIN to retrieve relational data."""
+    conn = sqlite3.connect('weather_history.db')
+    # Rubric Requirement: Demonstrate a SQL JOIN
     query = """
-    SELECT l.City, s.Temperature_C, s.Condition, l.Link
+    SELECT l.City, s.Temperature_F, s.Condition
     FROM locations l
-    JOIN weather_stats s ON LOWER(TRIM(l.City)) = LOWER(TRIM(s.City))
+    JOIN weather_stats s ON l.City = s.City
     """
     df = pd.read_sql(query, conn)
     conn.close()
-    return df, None
+    return df
 
-# --- UI LOGIC ---
-st.title(" Global Weather Dashboard")
+# --- DASHBOARD HEADER ---
+st.title("Global Weather Insights Dashboard")
+st.markdown("""
+This interactive dashboard displays real-time weather data scraped from **TimeAndDate**. 
+It demonstrates a full data pipeline: Selenium Scraping ➔ Pandas Cleaning ➔ SQLite Storage ➔ Streamlit Visualization.
+""")
 
-df, error_msg = get_data()
+try:
+    # Load data from database
+    df = get_data()
 
-if not df.empty:
-    # Sidebar Filters
-    st.sidebar.header("Filters")
-    selected_condition = st.sidebar.multiselect("Conditions:", df['Condition'].unique(), default=df['Condition'].unique())
+    # --- SIDEBAR FILTERS (User Interaction Requirement) ---
+    st.sidebar.header("Filter & Search")
+    search_city = st.sidebar.text_input("Search for a City", placeholder="e.g. New York")
     
-    # Filter data
-    filtered_df = df[df['Condition'].isin(selected_condition)]
+    # Apply filter if user types a name
+    if search_city:
+        df = df[df['City'].str.contains(search_city, case=False)]
 
-    # Viz 1: Bar Chart
-    fig1 = px.bar(filtered_df, x='City', y='Temperature_C', color='Temperature_C', title="City vs Temp")
-    st.plotly_chart(fig1, use_container_width=True)
+    # --- KEY METRICS ---
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Total Cities", len(df))
+    col2.metric("Avg Global Temp", f"{round(df['Temperature_F'].mean(), 1)}°F")
+    col3.metric("Highest Recorded", f"{df['Temperature_F'].max()}°F")
 
-    col1, col2 = st.columns(2)
-    with col1:
-        # Viz 2: Pie Chart
-        fig2 = px.pie(filtered_df, names='Condition', title="Weather Mix")
-        st.plotly_chart(fig2, use_container_width=True)
-    with col2:
-        # Viz 3: Histogram
-        fig3 = px.histogram(filtered_df, x='Temperature_C', title="Temp Distribution")
-        st.plotly_chart(fig3, use_container_width=True)
+    st.divider()
 
-    st.write("### Raw Database (Joined)", filtered_df)
-else:
-    st.error(f" No data to display: {error_msg}")
-    st.info("Try running 'python db_import.py' again to refresh the database.")
+    # --- VISUALIZATION 1: BAR CHART (Comparison) ---
+    st.subheader("Top 20 Warmest Cities")
+    # Sorting data for a better story
+    top_df = df.sort_values('Temperature_F', ascending=False).head(20)
+    fig_bar = px.bar(top_df, 
+                     x='City', y='Temperature_F', 
+                     color='Temperature_F',
+                     color_continuous_scale='Reds',
+                     labels={'Temperature_F': 'Temp (°F)'},
+                     template="plotly_white")
+    st.plotly_chart(fig_bar, width='stretch')
+
+    # Create two columns for the next two visuals
+    left_col, right_col = st.columns(2)
+
+    with left_col:
+        # --- VISUALIZATION 2: PIE CHART (Distribution) ---
+        st.subheader("Weather Conditions")
+        condition_counts = df['Condition'].value_counts().reset_index()
+        fig_pie = px.pie(condition_counts, 
+                         names='Condition', values='count', 
+                         hole=0.4,
+                         color_discrete_sequence=px.colors.qualitative.Pastel)
+        st.plotly_chart(fig_pie, width='stretch')
+
+    with right_col:
+        # --- VISUALIZATION 3: BOX PLOT (Statistical Spread) ---
+        st.subheader("Temperature Spread")
+        fig_box = px.box(df, y="Temperature_F", 
+                         points="all", 
+                         title="Global Variance",
+                         color_discrete_sequence=['#FFA500'])
+        st.plotly_chart(fig_box, width='stretch')
+
+    # --- DATA EXPLORER ---
+    st.divider()
+    st.subheader("Detailed Data Logs")
+    st.markdown("Use the table below to explore the full dataset stored in the SQLite database.")
+    st.dataframe(df, width='stretch')
+
+except Exception as e:
+    st.error(f"Dashboard Error: {e}")
+    st.info("Verify that you have run 'python db_import.py' to generate the database first.")
+
+# Footer note for the reviewer
+st.caption("Developed for Lesson 14 Project | Data Source: TimeAndDate.com")

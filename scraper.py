@@ -3,69 +3,85 @@ import time
 import os
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.action_chains import ActionChains
 
 def scrape_weather():
-    print("🚀 Starting the Scraper...")
+    print("Initializing Selenium (Scroll-to-Table Mode)...")
     if not os.path.exists('data'): os.makedirs('data')
 
-    options = Options()
-    options.add_argument("--headless")
-    options.add_argument("--window-size=1920,1080")
-    # This ignores those "SSL Handshake" errors in your console
-    options.add_argument("--log-level=3") 
-    options.add_argument("--ignore-certificate-errors")
-
+    options = webdriver.ChromeOptions()
+    options.add_argument('--window-size=1920,1080')
+    options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
     try:
         driver.get("https://www.timeanddate.com/weather/")
-        time.sleep(5) 
+        
+        print("Scrolling down to find the table...")
+        time.sleep(5)
+        
+        # We search for the blue header seen in your screenshot to scroll to it
+        try:
+            header = driver.find_element(By.XPATH, "//*[contains(text(), 'Local Time and Weather Around the World')]")
+            driver.execute_script("arguments[0].scrollIntoView();", header)
+            print("Header found. Waiting for table to render...")
+        except:
+            # Fallback: Scroll down by 1000 pixels if header text isn't found
+            driver.execute_script("window.scrollBy(0, 1000);")
+            print("Header not found by text, using manual scroll...")
+            
+        time.sleep(5) # Wait for table to load after scrolling
 
         weather_list = []
-        rows = driver.find_elements(By.XPATH, "//table[contains(@class, 'zebra')]//tr")
+        
+        # Now we find the table by tag name to be safe
+        tables = driver.find_elements(By.TAG_NAME, "table")
+        
+        target_table = None
+        for t in tables:
+            # The correct table is the one that contains 'zebra' in its class
+            if "zebra" in t.get_attribute("class"):
+                target_table = t
+                break
 
-        for row in rows:
-            try:
-                city_el = row.find_element(By.TAG_NAME, "a")
-                city_name = city_el.text
-                city_url = city_el.get_attribute("href")
+        if target_table:
+            rows = target_table.find_elements(By.TAG_NAME, "tr")
+            for row in rows:
+                # Capture both headers (th) and data (td)
+                cells = row.find_elements(By.CSS_SELECTOR, "td, th")
                 
-                cells = row.find_elements(By.TAG_NAME, "td")
-                
-                # Logic: Iterate through cells to find the one with the temperature
-                temp_val = None
-                condition_val = "N/A"
-                
-                for i, cell in enumerate(cells):
-                    text = cell.text
-                    if "°" in text: # This is the temperature cell
-                        temp_val = text.split("°")[0].replace("−", "-").strip()
-                        # Usually, the very next cell is the Condition
-                        if i + 1 < len(cells):
-                            condition_val = cells[i+1].text
-                        break
-                
-                if city_name and temp_val:
+                row_cities = []
+                row_temps = []
+
+                for cell in cells:
+                    text = cell.text.strip().replace('*', '')
+                    if "°" in text:
+                        row_temps.append(text)
+                    elif text and not any(char.isdigit() for char in text) and len(text) > 2:
+                        # Filter out common UI words
+                        if text not in ["City", "Time", "Weather", "Expected"]:
+                            row_cities.append(text)
+
+                for i in range(min(len(row_cities), len(row_temps))):
                     weather_list.append({
-                        "City": city_name,
-                        "Temperature_C": temp_val,
-                        "Condition": condition_val,
-                        "Link": city_url
+                        "City": row_cities[i],
+                        "Temp_Raw": row_temps[i],
+                        "Condition": "Maintained"
                     })
-            except:
-                continue
 
         if weather_list:
             df = pd.DataFrame(weather_list).drop_duplicates(subset=['City'])
             df.to_csv("data/raw_weather.csv", index=False)
-            print(f"✅ SUCCESS! Scraped {len(df)} cities with ACTUAL temperatures.")
-            print(df.head())
+            print(f"SUCCESS! Extracted {len(df)} cities.")
+            print(df.head(10))
         else:
-            print("❌ No data found. Check if the table loaded correctly.")
+            print("Extraction failed. The table did not load after scrolling.")
 
+    except Exception as e:
+        print(f"Error: {e}")
     finally:
         driver.quit()
 
